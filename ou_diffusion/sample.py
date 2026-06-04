@@ -9,6 +9,7 @@ def ddpm_sample(
     schedule: NoiseSchedule,
     n: int,
     L: int,
+    d: int = 1,
     device: str = "cpu",
     seed: int | None = None,
 ) -> torch.Tensor:
@@ -24,8 +25,8 @@ def ddpm_sample(
     def randn(shape):
         return torch.randn(shape, generator=gen, device=device)
 
-    x = randn((n, 1, L))                          
-    for k in reversed(range(schedule.T)):         
+    x = randn((n, d, L))
+    for k in reversed(range(schedule.T)):
         t = torch.full((n,), k, device=device, dtype=torch.long)
         eps = model(x, t)
         alpha = schedule.alphas[k]
@@ -36,5 +37,5 @@ def ddpm_sample(
         if k > 0:
             x = mean + torch.sqrt(beta) * randn(x.shape)
         else:
-            x = mean                              
-    return x.squeeze(1).cpu()
+            x = mean
+    return x.squeeze(1).cpu() if d == 1 else x.cpu()
