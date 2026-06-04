@@ -72,14 +72,11 @@ This is the known zero-terminal-SNR issue (Lin et al., 2024) reproduced in a set
 ```bash
 pip install -r requirements.txt              # numpy, torch
 
-# Fast end-to-end sanity check (tiny config):
-python -m scripts.run_ou --smoke
-
 # Full run (about 25 min on 1 CPU core; minutes on GPU with --device cuda):
-python -m scripts.run_ou --K 1000 --steps 6000 --save-samples samples.npy
+python -m scripts.run_ou --K 1000 --steps 6000 --device cuda
 
-# Optional: Kalman filtering demo on noisy measurements
-python -m scripts.run_ou --K 1000 --steps 6000 --kalman-demo --R 0.5
+# Kalman filtering demo on noisy measurements
+python -m scripts.run_ou --K 1000 --steps 6000 --kalman-demo --R 0.5 --device cuda
 ```
 
 ## 6. Repository layout
