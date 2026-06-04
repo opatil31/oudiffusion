@@ -2,17 +2,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 import torch
 
-
 @dataclass
 class NoiseSchedule:
-    """Container for the precomputed DDPM schedule tensors (all length T)."""
     T: int
-    betas: torch.Tensor            
-    alphas: torch.Tensor           
-    alphas_cumprod: torch.Tensor   
-    sqrt_ab: torch.Tensor          
-    sqrt_omab: torch.Tensor        
-    posterior_var: torch.Tensor    
+    betas: torch.Tensor
+    alphas: torch.Tensor
+    alphas_cumprod: torch.Tensor
+    sqrt_ab: torch.Tensor
+    sqrt_omab: torch.Tensor
+    posterior_var: torch.Tensor
 
     def to(self, device) -> "NoiseSchedule":
         return NoiseSchedule(
@@ -45,10 +43,8 @@ def make_linear_schedule(
         posterior_var=posterior_var.float(),
     )
 
-
 def _bcast(coef_t: torch.Tensor, ndim: int) -> torch.Tensor:
     return coef_t.view(-1, *([1] * (ndim - 1)))
-
 
 def q_sample(
     x0: torch.Tensor,

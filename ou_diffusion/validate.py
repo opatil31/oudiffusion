@@ -55,3 +55,10 @@ def validate(traj: np.ndarray, c: OUConstants) -> ValidationReport:
         rho1_gen=lag1_autocorrelation(traj),
         rho1_true=c.a,
     )
+
+def irreducible_eps_loss(c: OUConstants, L: int, alphas_cumprod) -> float:
+    from .oracle import gaussian_loss_floor
+
+    idx = np.arange(L)
+    Sigma = c.s2 * c.a ** np.abs(idx[:, None] - idx[None, :])
+    return gaussian_loss_floor(Sigma, alphas_cumprod)
