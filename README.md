@@ -92,6 +92,4 @@ ou_diffusion/
   validate.py       statistics vs targets
 scripts/
   run_ou.py                   end-to-end pipeline
-```dules and Sample Steps are Flawed.* WACV 2024 — zero terminal SNR.
-- Särkkä. *Bayesian Filtering and Smoothing.* CUP 2013 — Kalman filtering background.
-- Chen et al. *Diffusion Forcing: Next-token Prediction Meets Full-Sequence Diffusion.* NeurIPS 2024; Ruhe et al. *Rolling Diffusion Models.* ICML 2024 — Phase-B directions.
+```
