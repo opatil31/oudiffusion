@@ -12,15 +12,15 @@ $$dx_t = -\theta\, x_t\, dt + \sigma\, dW_t, \qquad \theta, \sigma > 0,$$
 
 the continuous-time analogue of an AR(1) model: mean-reverting toward 0 at rate $\theta$, driven by a scalar Wiener process. It is the cleanest possible data source for a diffusion model because it is **exact at every level**:
 
-- **Exact sampler.** The transition over a step $\Delta t$ is Gaussian with no discretization error:
+- **Exact sampler:** The transition over a step $\Delta t$ is Gaussian with no discretization error:
 
 $$x_{\ell} = a\, x_{\ell-1} + \sqrt{q}\,\xi, \qquad a = e^{-\theta \Delta t}, \quad q = \tfrac{\sigma^2}{2\theta}\left(1 - e^{-2\theta \Delta t}\right), \quad \xi \sim \mathcal N(0,1).$$
 
-- **Exact target statistics.** The stationary distribution is $\mathcal N(0, s^2)$ with $s^2 = \sigma^2/2\theta$, and the lag-1 autocorrelation is $a$. Generated trajectories must reproduce both numbers.
-- **Exact filter.** The model is linear-Gaussian, so the optimal estimator under measurement noise is the two-line scalar Kalman filter.
-- **Exact denoiser and loss floor.** OU trajectories are *jointly Gaussian*, which makes the optimal noise predictor.
+- **Exact target statistics:** The stationary distribution is $\mathcal N(0, s^2)$ with $s^2 = \sigma^2/2\theta$, and the lag-1 autocorrelation is $a$. Generated trajectories must reproduce both numbers.
+- **Exact filter:** The model is linear-Gaussian, so the optimal estimator under measurement noise is the two-line scalar Kalman filter.
+- **Exact denoiser and loss floor:** OU trajectories are *jointly Gaussian*, which makes the optimal noise predictor.
 
-**Two clocks.** Throughout, physical time $\ell$ (indexing the trajectory) and diffusion time $k$ (indexing the noising/denoising ladder) are distinct axes. The generative model treats each trajectory $x^{(0)} \in \mathbb R^L$ as a fixed data point and never sees the physical SDE again, the structural echo between the OU transition and the DDPM forward step (both are "shrink and add Gaussian noise") lives on *different clocks*. Keeping the two clocks separate is the conceptual backbone of the planned autoregressive extension, where they form a frames × noise-levels lattice.
+**Two clocks:** Throughout, physical time $\ell$ (indexing the trajectory) and diffusion time $k$ (indexing the noising/denoising ladder) are distinct axes. The generative model treats each trajectory $x^{(0)} \in \mathbb R^L$ as a fixed data point and never sees the physical SDE again, the structural echo between the OU transition and the DDPM forward step (both are "shrink and add Gaussian noise") lives on *different clocks*. Keeping the two clocks separate is the conceptual backbone of the planned autoregressive extension, where they form a frames × noise-levels lattice.
 
 ## 2. The pipeline
 
@@ -58,14 +58,14 @@ Training loss plateaus at **0.10–0.12**, oscillating around the **0.1071** flo
 **Error attribution.** The network sits at the information-theoretic loss floor *and* matches the oracle's output statistics, so the residual $\sim 2\%$ variance gap to the exact target is **sampler discretization bias** (finite $K$, fixed-$\beta$ reverse variance, residual terminal signal), not learning error.
 ## 4. A measured finding: terminal SNR and the choice of $K$
 
-The note suggests $K = 200$ diffusion steps works fine. However the linear $\beta \in [10^{-4}, 0.02]$ schedule only reaches $\bar\alpha_K \approx 0.132$ at $K = 200$: about $36\%$ of the signal *amplitude* survives the forward process, so initializing the reverse process at pure $\mathcal N(0, I)$ is mis-specified. The oracle makes this exactly measurable:
+The note suggests $K = 200$ diffusion steps works fine. However the linear $\beta \in [10^{-4}, 0.02]$ schedule only reaches $\bar\alpha_K \approx 0.132$ at $K = 200$: about $36\%$ of the signal *amplitude* survives the forward process, so initializing the reverse process at pure $\mathcal N(0, I)$ is mis-specified. An oracle computation makes this exactly measurable:
 
 | $K$ | $\bar\alpha_K$ | oracle marginal variance (target 0.5) |
 |---|---|---|
 | 200 | 0.132 | 0.365 (−27%) |
 | 1000 | $4\times10^{-5}$ | 0.491 (−1.8%) |
 
-This is the known zero-terminal-SNR issue (Lin et al., 2024) reproduced in a setting where it can be quantified *exactly*, with the learning component ruled out. Remedies, in increasing order of effort: use $K = 1000$ (default in the commands below), we could also try switching to a cosine scheduler.
+Remedies would be to use $K = 1000$ (default in the commands below), we could also try switching to a cosine scheduler.
 
 ## 5. Quickstart
 
