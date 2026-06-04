@@ -19,7 +19,6 @@ class TrainConfig:
     log_every: int = 1_000
     seed: int = 0
 
-
 def train_denoiser(
     x0: np.ndarray,
     schedule: NoiseSchedule,
@@ -31,10 +30,14 @@ def train_denoiser(
     device = torch.device(device)
     schedule = schedule.to(device)
 
-    data = torch.as_tensor(x0, dtype=torch.float32, device=device).unsqueeze(1)  # (N,1,L)
+    data = torch.as_tensor(x0, dtype=torch.float32, device=device)
+    if data.ndim == 2:
+        data = data.unsqueeze(1)
+    if data.ndim != 3:
+        raise ValueError(f"expected (N, L) or (N, d, L) data, got {tuple(data.shape)}")
     N = data.shape[0]
 
-    model = UNet1D(in_ch=1, base=cfg.base_channels).to(device)
+    model = UNet1D(in_ch=data.shape[1], base=cfg.base_channels).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     ema = EMA(model, decay=cfg.ema_decay)
     gen = torch.Generator(device=device).manual_seed(cfg.seed)
@@ -43,7 +46,7 @@ def train_denoiser(
     model.train()
     for step in range(1, cfg.steps + 1):
         idx = torch.randint(0, N, (cfg.batch_size,), generator=gen, device=device)
-        xb = data[idx]                                              # (B,1,L)
+        xb = data[idx]
         t = torch.randint(0, schedule.T, (cfg.batch_size,), generator=gen, device=device)
         xt, eps = q_sample(xb, t, schedule)
         eps_pred = model(xt, t)
