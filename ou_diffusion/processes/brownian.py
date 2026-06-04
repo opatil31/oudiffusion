@@ -1,5 +1,5 @@
 """
-I've implemented brownian motion as one of my additional wiener process because it has
+I've implemented brownian motion as one of my additional process (wiener) because it has
 nonstationarity as a property but is still gaussian so we can have an analytic oracle.
 """
 from __future__ import annotations
