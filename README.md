@@ -37,13 +37,13 @@ The U-Net is the note's 3-resolution design: $1\times L \to C\times L \to 2C\tim
 **Filtering is a separate task from diffusion**, and the repo keeps them separate on purpose: diffusion noise is *designed*, added on the diffusion clock, and removed by the learned reverse process; measurement noise is *given*, lives on the physical clock, and is removed by the Kalman filter. For this linear-Gaussian signal both removals are Bayesian posterior computations, which is exactly why OU is the right place to first see their relationship.
 
 ## 3. Verification
-**The training loss has a known floor.** Because $x^{(0)} \sim \mathcal N(0, \Sigma)$ with $\Sigma_{ij} = s^2 a^{|i-j|}$, the posterior covariance of $\epsilon$ given $x^{(k)}$ is $I - (1-\bar\alpha_k)\Sigma_k^{-1}$ with $\Sigma_k = \bar\alpha_k \Sigma + (1-\bar\alpha_k) I$, so the irreducible per-coordinate $\epsilon$-prediction MSE, averaged over uniformly sampled $k$, is
+**The training loss has a known floor:** Because $x^{(0)} \sim \mathcal N(0, \Sigma)$ with $\Sigma_{ij} = s^2 a^{|i-j|}$, the posterior covariance of $\epsilon$ given $x^{(k)}$ is $I - (1-\bar\alpha_k)\Sigma_k^{-1}$ with $\Sigma_k = \bar\alpha_k \Sigma + (1-\bar\alpha_k) I$, so the irreducible per-coordinate $\epsilon$-prediction MSE, averaged over uniformly sampled $k$, is
 
 $$\mathcal L^\star = \frac1K \sum_k \Big[ 1 - (1-\bar\alpha_k)\, \tfrac1L\, \mathrm{tr}\,\Sigma_k^{-1} \Big] = \mathbf{0.1071} \quad (\theta{=}1, \sigma{=}1, \Delta t{=}0.05, L{=}64, K{=}1000).$$
 
 A network whose loss plateaus here *is* the optimal denoiser; more training or capacity cannot help. (`validate.irreducible_eps_loss`)
 
-**Output statistics against exact targets.** Marginal variance vs $s^2 = 0.5$; lag-1 autocorrelation vs $a = e^{-0.05} \approx 0.9512$.
+**Output statistics against exact targets:** Marginal variance vs $s^2 = 0.5$; lag-1 autocorrelation vs $a = e^{-0.05} \approx 0.9512$.
 
 ### Results ($K = 1000$, $6{,}000$ training steps, $N = 10{,}000$, $L = 64$)
 
