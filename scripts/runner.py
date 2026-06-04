@@ -1,9 +1,9 @@
 """
 Usage:
 -----
-python -m scripts.run --process ou --K 1000 --steps 6000
-python -m scripts.run --process bm --K 1000 --steps 6000 --mu 0.3
-python -m scripts.run --process ou --kalman-demo --R 0.5
+python -m scripts.runner --process ou --K 1000 --steps 6000
+python -m scripts.runner --process bm --K 1000 --steps 6000 --mu 0.3
+python -m scripts.runner --process ou --kalman-demo --R 0.5
 """
 
 from __future__ import annotations
