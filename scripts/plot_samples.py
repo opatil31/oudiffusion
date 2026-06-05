@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from ou_diffusion import PROCESSES, get_process
+from ou_diffusion import PROCESSES, make_process
 
 def main(argv=None):
     p = argparse.ArgumentParser()
@@ -32,13 +32,10 @@ def main(argv=None):
     if gen.ndim == 3:
         gen = gen[:, 0, :]
     L = gen.shape[1]
-    if args.process == "ou":
-        proc = get_process("ou", theta=args.theta, sigma=args.sigma, dt=args.dt)
-        band = 2.0 * np.sqrt(proc.c.s2)
-    else:
-        proc = get_process("bm", mu=args.mu, sigma=args.sigma, dt=args.dt, x0=args.x0)
-        band = 2.0 * np.sqrt(args.sigma**2 * args.dt * (L - 1))
-    real = proc.exact_sample(args.n_show, L, seed=args.seed)[:, 0, :]
+    proc = make_process(args.process, theta=args.theta, sigma=args.sigma, dt=args.dt, mu=args.mu, x0=args.x0)
+    real = proc.exact_sample(max(args.n_show, 200), L, seed=args.seed)[:, 0, :]
+    band = 2.0 * float(real.std())
+    real = real[: args.n_show]
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.2), sharey=True)
     for ax, data, title in (

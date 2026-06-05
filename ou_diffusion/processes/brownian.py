@@ -16,6 +16,9 @@ class BrownianMotion(Process):
         if sigma <= 0 or dt <= 0:
             raise ValueError("sigma and dt must be positive.")
         self.mu, self.sigma, self.dt, self.x0 = float(mu), float(sigma), float(dt), float(x0)
+    
+    def describe(self) -> dict:
+        return dict(theta=self.c.theta, sigma=self.c.sigma, dt=self.c.dt)
 
     def exact_sample(self, N: int, L: int, seed: int | None = None) -> np.ndarray:
         rng = np.random.default_rng(seed)

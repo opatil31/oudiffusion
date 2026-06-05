@@ -72,6 +72,9 @@ class Process(ABC):
     @abstractmethod
     def validate(self, traj: np.ndarray) -> ProcessReport:
         """Compare trajectory statistics against exact targets."""
+    def describe(self) -> dict:
+        """Constructor parameters, for logging."""
+        return {}
     # closed forms overrides
     def mean(self, L: int) -> np.ndarray:
         """Mean of the flattened trajectory, shape (d*L,)."""

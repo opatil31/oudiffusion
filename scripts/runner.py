@@ -4,6 +4,7 @@ Usage:
 python -m scripts.runner --process ou --K 1000 --steps 6000
 python -m scripts.runner --process bm --K 1000 --steps 6000 --mu 0.3
 python -m scripts.runner --process ou --kalman-demo --R 0.5
+python -m scripts.runner --process gbm --K 1000 --steps 6000 --baseline
 """
 
 from __future__ import annotations
@@ -17,10 +18,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ou_diffusion import (
     PROCESSES,
     TrainConfig,
+    FittedGaussianBaseline,
     add_measurement_noise,
     ddpm_sample,
     gaussian_loss_floor,
-    get_process,
+    make_process,
     kalman_filter,
     make_linear_schedule,
     steady_state_variance,
@@ -31,12 +33,14 @@ from ou_diffusion import (
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="exact-toy diffusion pipeline")
     p.add_argument("--process", type=str, default="ou", choices=sorted(PROCESSES))
+
     # shared process parameters (interpretation depends on the process)
-    p.add_argument("--theta", type=float, default=1.0, help="OU mean-reversion rate")
-    p.add_argument("--sigma", type=float, default=1.0, help="diffusion coefficient")
-    p.add_argument("--dt", type=float, default=0.05)
-    p.add_argument("--mu", type=float, default=0.0, help="BM drift")
-    p.add_argument("--x0", type=float, default=0.0, help="BM start value")
+    p.add_argument("--theta", type=float, default=None, help="OU mean-reversion rate")
+    p.add_argument("--sigma", type=float, default=None, help="diffusion coefficient")
+    p.add_argument("--dt", type=float, default=None)
+    p.add_argument("--mu", type=float, default=None, help="BM/GBM drift")
+    p.add_argument("--x0", type=float, default=None, help="BM/GBM start value")
+
     p.add_argument("--L", type=int, default=64)
     p.add_argument("--N", type=int, default=10_000)
     p.add_argument("--K", type=int, default=1000, help="number of diffusion steps")
@@ -49,6 +53,8 @@ def parse_args(argv=None):
     p.add_argument("--n-samples", type=int, default=4_000)
     p.add_argument("--save-samples", type=str, default=None,
                    help="optional .npy path to save generated trajectories")
+    p.add_argument("--baseline", action="store_true",
+                   help="also fit + validate the moment-matched Gaussian baseline")
     p.add_argument("--kalman-demo", action="store_true", help="(OU only)")
     p.add_argument("--R", type=float, default=0.5, help="measurement variance for Kalman demo")
     p.add_argument("--smoke", action="store_true",
@@ -57,11 +63,7 @@ def parse_args(argv=None):
 
 
 def build_process(args):
-    if args.process == "ou":
-        return get_process("ou", theta=args.theta, sigma=args.sigma, dt=args.dt)
-    if args.process == "bm":
-        return get_process("bm", mu=args.mu, sigma=args.sigma, dt=args.dt, x0=args.x0)
-    raise KeyError(args.process)
+    return make_process(args.process, theta=args.theta, sigma=args.sigma, dt=args.dt, mu=args.mu, x0=args.x0)
 
 
 def main(argv=None):
@@ -75,7 +77,7 @@ def main(argv=None):
         args.n_samples = 1_000
 
     proc = build_process(args)
-    print(f"process: {proc.name} (d={proc.d}, gaussian={proc.is_gaussian})")
+    print(f"process: {proc.name} {proc.describe()} (d={proc.d}, gaussian={proc.is_gaussian})")
 
     # stage 1
     x0 = proc.exact_sample(args.N, args.L, seed=args.seed)
@@ -102,6 +104,11 @@ def main(argv=None):
         floor = gaussian_loss_floor(proc.covariance(args.L),
                                     schedule.alphas_cumprod.numpy())
         print(f"irreducible eps-MSE loss floor for this config: {floor:.4f}")
+    else:
+        note = "non-Gaussian process, so no Gaussian oracle / loss floor on raw data"
+        if hasattr(proc, "log_process"):
+            note += " (exact verification available via the log-space reduction)"
+        print(note)
 
     # stage 4
     cfg = TrainConfig(steps=args.steps, batch_size=args.batch_size, lr=args.lr,
@@ -113,6 +120,11 @@ def main(argv=None):
     samples = samples.numpy()
     print("\n[generated samples]")
     print(proc.validate(samples))
+    if args.baseline:
+        base = FittedGaussianBaseline().fit(x0)
+        bsamples = base.sample(args.n_samples, seed=args.seed + 3)
+        print("\n[fitted-Gaussian baseline]")
+        print(proc.validate(bsamples))
     if args.save_samples:
         np.save(args.save_samples, samples)
         print(f"saved generated samples to {args.save_samples}")

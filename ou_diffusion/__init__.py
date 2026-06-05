@@ -1,14 +1,3 @@
-"""
-ou_process / processes.OUProcess     -- Stage 1 data
-schedule.make_linear_schedule        -- Stage 2 forward (q_sample)
-kalman.kalman_filter                 -- Stage 3 (optional)
-train.train_denoiser, sample.ddpm_sample -- Stage 4
-validate.validate                    -- OU statistics check
-processes.Process / get_process      -- data sources with exact targets
-oracle.AnalyticGaussianDenoiser      -- optimal denoiser for Gaussian data
-oracle.gaussian_loss_floor           -- irreducible eps-MSE training floor
-"""
-
 from .ou_process import (
     OUConstants,
     ou_constants,
@@ -29,6 +18,7 @@ from .validate import (
     irreducible_eps_loss,
 )
 from .oracle import AnalyticGaussianDenoiser, gaussian_loss_floor
+from .baseline import FittedGaussianBaseline
 from .processes import (
     Process,
     ProcessReport,
@@ -36,8 +26,10 @@ from .processes import (
     LinearTransition,
     OUProcess,
     BrownianMotion,
+    GeometricBrownianMotion,
     PROCESSES,
     get_process,
+    make_process,
 )
 
 __all__ = [
@@ -50,6 +42,6 @@ __all__ = [
     "irreducible_eps_loss",
     "AnalyticGaussianDenoiser", "gaussian_loss_floor",
     "Process", "ProcessReport", "StatCheck", "LinearTransition",
-    "OUProcess", "BrownianMotion", "PROCESSES", "get_process",
+    "OUProcess", "BrownianMotion", "GeometricBrownianMotion", "PROCESSES", "get_process", "make_process",
 ]
 

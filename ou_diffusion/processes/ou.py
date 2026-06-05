@@ -11,6 +11,9 @@ class OUProcess(Process):
     def __init__(self, theta: float = 1.0, sigma: float = 1.0, dt: float = 0.05):
         self.c: OUConstants = ou_constants(theta, sigma, dt)
 
+    def describe(self) -> dict:
+        return dict(theta=self.c.theta, sigma=self.c.sigma, dt=self.c.dt)
+
     def exact_sample(self, N: int, L: int, seed: int | None = None) -> np.ndarray:
         x = generate_ou_dataset(self.c.theta, self.c.sigma, self.c.dt, L, N, seed)
         return x[:, None, :]
