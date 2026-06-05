@@ -24,6 +24,13 @@ class StatCheck:
     generated: float
     target: float
     kind: str = "abs"  # "abs" or "rel"
+    se: float | None = None
+
+    @property
+    def z(self) -> float | None:
+        if self.se is None or self.se <= 0:
+            return None
+        return (self.generated - self.target) / self.se
 
     @property
     def error(self) -> float:
@@ -41,10 +48,11 @@ class ProcessReport:
         for c in self.checks:
             unit = "% (rel)" if c.kind == "rel" else "  (abs)"
             err = c.error * 100 if c.kind == "rel" else c.error
-            rows.append(
-                f"{c.name:<22s} {c.generated:11.4f} {c.target:11.4f} "
-                f"{err:10.4f}{unit}"
-            )
+            row = (f"{c.name:<22s} {c.generated:11.4f} {c.target:11.4f} "
+                   f"{err:10.4f}{unit}")
+            if c.z is not None:
+                row += f"  z={c.z:+.1f}"
+            rows.append(row)
         return "\n".join([head] + rows)
 
     def max_error(self, kind: str | None = None) -> float:

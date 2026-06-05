@@ -27,6 +27,8 @@ from .processes import (
     OUProcess,
     BrownianMotion,
     GeometricBrownianMotion,
+    VectorOU,
+    StochasticOscillator,
     PROCESSES,
     get_process,
     make_process,
@@ -42,6 +44,7 @@ __all__ = [
     "irreducible_eps_loss",
     "AnalyticGaussianDenoiser", "gaussian_loss_floor",
     "Process", "ProcessReport", "StatCheck", "LinearTransition",
-    "OUProcess", "BrownianMotion", "GeometricBrownianMotion", "PROCESSES", "get_process", "make_process",
+    "OUProcess", "BrownianMotion", "GeometricBrownianMotion", "VectorOU", "StochasticOscillator" 
+    "PROCESSES", "get_process", "make_process",
 ]
 

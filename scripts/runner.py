@@ -5,6 +5,8 @@ python -m scripts.runner --process ou --K 1000 --steps 6000
 python -m scripts.runner --process bm --K 1000 --steps 6000 --mu 0.3
 python -m scripts.runner --process ou --kalman-demo --R 0.5
 python -m scripts.runner --process gbm --K 1000 --steps 6000 --baseline
+python -m scripts.runner --process vou --K 1000 --steps 6000 --device cuda --save-samples vou_samples.npy
+python -m scripts.runner --process osc --K 1000 --steps 8000 --device cuda --save-samples osc_samples.npy
 """
 
 from __future__ import annotations
@@ -40,6 +42,8 @@ def parse_args(argv=None):
     p.add_argument("--dt", type=float, default=None)
     p.add_argument("--mu", type=float, default=None, help="BM/GBM drift")
     p.add_argument("--x0", type=float, default=None, help="BM/GBM start value")
+    p.add_argument("--omega", type=float, default=None, help="VOU rotation / OSC frequency")
+    p.add_argument("--zeta", type=float, default=None, help="OSC damping ratio")
 
     p.add_argument("--L", type=int, default=64)
     p.add_argument("--N", type=int, default=10_000)
@@ -63,7 +67,7 @@ def parse_args(argv=None):
 
 
 def build_process(args):
-    return make_process(args.process, theta=args.theta, sigma=args.sigma, dt=args.dt, mu=args.mu, x0=args.x0)
+    return make_process(args.process, theta=args.theta, sigma=args.sigma, dt=args.dt, mu=args.mu, x0=args.x0, omega=args.omega, zeta=args.zeta)
 
 
 def main(argv=None):
@@ -109,6 +113,10 @@ def main(argv=None):
         if hasattr(proc, "log_process"):
             note += " (exact verification available via the log-space reduction)"
         print(note)
+        F = x0.reshape(x0.shape[0], -1)
+        lin = gaussian_loss_floor(np.cov(F.T, bias=True), schedule.alphas_cumprod.numpy())
+        print(f"linear-denoiser loss bound (empirical covariance): {lin:.4f}")
+        print("  -> a loss plateau below this proves the model beats every linear denoiser")
 
     # stage 4
     cfg = TrainConfig(steps=args.steps, batch_size=args.batch_size, lr=args.lr,

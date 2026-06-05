@@ -34,7 +34,7 @@ class GeometricBrownianMotion(Process):
         checks: list[StatCheck] = []
 
         checks.append(StatCheck("frac values <= 0", float((x <= 0.0).mean()), 0.0, "abs"))
-
+ 
         pos = x[(x > 0.0).all(axis=1)]
         if pos.shape[0] >= 2:
             r = np.diff(np.log(pos), axis=1)
@@ -46,7 +46,7 @@ class GeometricBrownianMotion(Process):
                           self.sigma**2 * self.dt, "rel"),
                 StatCheck("log-ret lag-1 corr", rho, 0.0, "abs"),
             ]
-
+ 
         term = x[:, -1]
         checks.append(StatCheck(
             "terminal mean", float(term.mean()),
@@ -56,6 +56,14 @@ class GeometricBrownianMotion(Process):
         skew = float((tc**3).mean() / std**3) if std > 0 else 0.0
         v = self.sigma**2 * (L - 1) * self.dt
         skew_target = (np.exp(v) + 2.0) * np.sqrt(np.exp(v) - 1.0)
-        checks.append(StatCheck("terminal skewness", skew, skew_target, "rel"))
-
+        se = None
+        if term.size >= 200:
+            rng = np.random.default_rng(0)
+            idx = rng.integers(0, term.size, size=(200, term.size))
+            tt = term[idx]
+            ttc = tt - tt.mean(axis=1, keepdims=True)
+            sks = (ttc**3).mean(axis=1) / ttc.std(axis=1) ** 3
+            se = float(sks.std())
+        checks.append(StatCheck("terminal skewness", skew, skew_target, "rel", se=se))
+ 
         return ProcessReport(self.name, checks)

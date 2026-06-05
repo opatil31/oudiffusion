@@ -4,11 +4,14 @@ from .base import LinearTransition, Process, ProcessReport, StatCheck, as_ndl
 from .brownian import BrownianMotion
 from .ou import OUProcess
 from .gbm import GeometricBrownianMotion
+from .vector_ou import VectorOU, StochasticOscillator
 
 PROCESSES: dict[str, type[Process]] = {
     "ou": OUProcess,
     "bm": BrownianMotion,
     "gbm": GeometricBrownianMotion,
+    "vou": VectorOU,
+    "osc": StochasticOscillator,
 }
 
 def get_process(name: str, **kwargs) -> Process:
@@ -34,6 +37,8 @@ __all__ = [
     "as_ndl",
     "OUProcess",
     "BrownianMotion",
+    "VectorOU",
+    "StochasticOscillator",
     "PROCESSES",
     "get_process",
 ]
