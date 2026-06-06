@@ -27,16 +27,6 @@ This project focuses on the data sources are chosen so that the dataset has exac
 
 All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is an exact trajectory sampler **plus its own ground truth**, validation targets, the exact one-step transition kernel $x_{\ell+1}\mid x_\ell \sim \mathcal N(Ax_\ell+b,\,Q)$ (exposed deliberately: it is what autoregressive validation will condition on), and, for Gaussian processes, the mean and covariance of the flattened trajectory, which feed the oracle and loss floor of Section 4. Vector-valued systems map onto the existing U-Net with **channels = state dimensions**, no architecture change.
 
-**Scalar OU** is the continuous-time AR(1): exact transition $x_\ell = a x_{\ell-1} + \sqrt q\,\xi$ with $a=e^{-\theta\Delta t}$, $q=\frac{\sigma^2}{2\theta}(1-e^{-2\theta\Delta t})$, stationary $\mathcal N(0,\sigma^2/2\theta)$, and because the model is linear-Gaussian, an exact Kalman filter under measurement noise, kept deliberately separate from diffusion (designed noise on the diffusion clock vs given noise on the physical clock).
-
-**Brownian motion** ($\pm$ drift) is the $a=1$ boundary case and the first *nonstationary* dataset: $\mathrm{Var}(x_\ell)=\sigma^2\ell\Delta t$ grows, the covariance $\sigma^2\Delta t\min(i,j)$ is non-Toeplitz and singular at $\ell=0$, handled exactly by the oracle, since a deterministic coordinate has irreducible loss 0. It doubles as an architectural probe: translation-equivariant convolutions sense absolute position only through boundary padding, which proved sufficient at $L=64$ (all targets pass at the 1–2% level with no coordinate channel).
-
-**Geometric Brownian motion** is the first **non-Gaussian** case: lognormal marginals, strictly positive, right-skewed. By design there is no Gaussian oracle, verification goes through the exact log-space reduction ($\log x$ *is* Brownian motion with drift $\nu=\mu-\sigma^2/2$) plus lognormal moment targets and positivity. It is paired with two instruments: the **fitted-Gaussian baseline** (moment-matched control, passes every check for every Gaussian process, the honest statement that diffusion is overkill there) and the **linear-denoiser bound** (the Gaussian loss floor of the empirical covariance). Measured: the trained network's loss plateaus ≈18% *below* the linear bound (0.063 vs 0.0765), its nonlinearity provably necessary, while the baseline fails the shape checks exactly as designed (3.8% impossible negative values; terminal skewness 0.03 against a target of 2.96).
-
-**Vector OU / stochastic oscillator** introduces matrix dynamics with the same closed forms the note's state-space forward process uses.
-
-**The 1D stochastic heat equation** on a periodic ring closes the roster: discretized as a vector OU with $\Theta=\lambda I+\kappa\,\mathrm{Lap}$ and its $(N,d,L)$ output is structurally a low-resolution video. The new content is spectral: $\Theta$ diagonalizes in the Fourier basis into independent scalar OU modes whose stationary variances $\sigma^2/2\theta_j$ span ≈33:1 at the defaults. Because translation invariance equalizes all *site* variances, channel normalization reduces to a global rescale here, the heat equation isolates *within-channel spectral stiffness*.
-
 ## 3. The pipeline
 
 | Stage | Math | Module |
