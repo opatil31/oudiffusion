@@ -19,11 +19,11 @@ This project focuses on the data sources are chosen so that the dataset has exac
 
 | process | dynamics | new difficulty | exact verification anchors |
 |---|---|---|---|
-| `ou` | $dx=-\theta x\,dt+\sigma\,dW$ | baseline | stationary $\sigma^2/2\theta$, lag-1 $e^{-\theta\Delta t}$, Kalman, oracle + loss floor |
-| `bm` | $dx=\mu\,dt+\sigma\,dW$ | nonstationary, singular cov | variance-growth slope, increment statistics |
-| `gbm` | $dx=\mu x\,dt+\sigma x\,dW$ | **non-Gaussian**, positive | log-space reduction, lognormal moments, linear-denoiser bound |
-| `vou` / `osc` | $dx=-\Theta x\,dt+B\,dW$ | matrix dynamics, $d{=}2$ channels | Van Loan $A,Q$; Lyapunov $S$; lag-$h$ laws $A^hS$ |
-| `heat` | $du=[-\lambda u+\kappa\,\partial_x^2u]\,dt+\sigma\,dW$ | spatial field, stiff spectrum | per-mode OU targets, $\theta_j=\lambda+4\kappa\sin^2(\pi j/d)$ |
+| `ou` | $dx=-\theta x\dt+\sigma\dW$ | baseline | stationary $\sigma^2/2\theta$, lag-1 $e^{-\theta\Delta t}$, Kalman, oracle + loss floor |
+| `bm` | $dx=\mu\dt+\sigma\dW$ | nonstationary, singular cov | variance-growth slope, increment statistics |
+| `gbm` | $dx=\mu x\dt+\sigma x\dW$ | **non-Gaussian**, positive | log-space reduction, lognormal moments, linear-denoiser bound |
+| `vou` / `osc` | $dx=-\Theta x\dt+B\dW$ | matrix dynamics, $d{=}2$ channels | Van Loan $A,Q$; Lyapunov $S$; lag-$h$ laws $A^hS$ |
+| `heat` | $du=[-\lambda u+\kappa\\partial_x^2u]\,dt+\sigma\,dW$ | spatial field, stiff spectrum | per-mode OU targets, $\theta_j=\lambda+4\kappa\sin^2(\pi j/d)$ |
 
 All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is an exact trajectory sampler **plus its own ground truth**, validation targets, the exact one-step transition kernel $x_{\ell+1}\mid x_\ell \sim \mathcal N(Ax_\ell+b,\,Q)$ (exposed deliberately: it is what autoregressive validation will condition on), and, for Gaussian processes, the mean and covariance of the flattened trajectory, which feed the oracle and loss floor of Section 4. Vector-valued systems map onto the existing U-Net with **channels = state dimensions**, no architecture change.
 
@@ -31,11 +31,11 @@ All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is 
 
 **Brownian motion** ($\pm$ drift) is the $a=1$ boundary case and the first *nonstationary* dataset: $\mathrm{Var}(x_\ell)=\sigma^2\ell\Delta t$ grows, the covariance $\sigma^2\Delta t\min(i,j)$ is non-Toeplitz and singular at $\ell=0$, handled exactly by the oracle, since a deterministic coordinate has irreducible loss 0. It doubles as an architectural probe: translation-equivariant convolutions sense absolute position only through boundary padding, which proved sufficient at $L=64$ (all targets pass at the 1–2% level with no coordinate channel).
 
-**Geometric Brownian motion** is the first **non-Gaussian** case: lognormal marginals, strictly positive, right-skewed. By design there is no Gaussian oracle; verification goes through the exact log-space reduction ($\log x$ *is* Brownian motion with drift $\nu=\mu-\sigma^2/2$) plus lognormal moment targets and positivity. It is paired with two instruments: the **fitted-Gaussian baseline** (moment-matched control, passes every check for every Gaussian process, the honest statement that diffusion is overkill there) and the **linear-denoiser bound** (the Gaussian loss floor of the empirical covariance). Measured: the trained network's loss plateaus ≈18% *below* the linear bound (0.063 vs 0.0765), its nonlinearity provably necessary, while the baseline fails the shape checks exactly as designed (3.8% impossible negative values; terminal skewness 0.03 against a target of 2.96).
+**Geometric Brownian motion** is the first **non-Gaussian** case: lognormal marginals, strictly positive, right-skewed. By design there is no Gaussian oracle, verification goes through the exact log-space reduction ($\log x$ *is* Brownian motion with drift $\nu=\mu-\sigma^2/2$) plus lognormal moment targets and positivity. It is paired with two instruments: the **fitted-Gaussian baseline** (moment-matched control, passes every check for every Gaussian process, the honest statement that diffusion is overkill there) and the **linear-denoiser bound** (the Gaussian loss floor of the empirical covariance). Measured: the trained network's loss plateaus ≈18% *below* the linear bound (0.063 vs 0.0765), its nonlinearity provably necessary, while the baseline fails the shape checks exactly as designed (3.8% impossible negative values; terminal skewness 0.03 against a target of 2.96).
 
-**Vector OU / stochastic oscillator** introduces matrix dynamics with the same closed forms the note's state-space forward process uses, under exact tests: the Van Loan block trick yields $A=e^{-\Theta\Delta t}$ and the Lyapunov-integral $Q$ from one matrix exponential (diagonal-$\Theta$ reproduces scalar OU to $10^{-12}$; Lyapunov residuals $<10^{-10}$).
+**Vector OU / stochastic oscillator** introduces matrix dynamics with the same closed forms the note's state-space forward process uses.
 
-**The 1D stochastic heat equation** on a periodic ring closes the roster: discretized as a vector OU with $\Theta=\lambda I+\kappa\,\mathrm{Lap}$, it inherits the entire Van Loan / Lyapunov / oracle machinery, and its $(N,d,L)$ output is structurally a low-resolution video. The new content is spectral: $\Theta$ diagonalizes in the Fourier basis into independent scalar OU modes whose stationary variances $\sigma^2/2\theta_j$ span ≈33:1 at the defaults. Because translation invariance equalizes all *site* variances, channel normalization reduces to a global rescale here, the heat equation isolates *within-channel spectral stiffness*.
+**The 1D stochastic heat equation** on a periodic ring closes the roster: discretized as a vector OU with $\Theta=\lambda I+\kappa\,\mathrm{Lap}$ and its $(N,d,L)$ output is structurally a low-resolution video. The new content is spectral: $\Theta$ diagonalizes in the Fourier basis into independent scalar OU modes whose stationary variances $\sigma^2/2\theta_j$ span ≈33:1 at the defaults. Because translation invariance equalizes all *site* variances, channel normalization reduces to a global rescale here, the heat equation isolates *within-channel spectral stiffness*.
 
 ## 3. The pipeline
 
