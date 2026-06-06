@@ -19,6 +19,7 @@ from .validate import (
 )
 from .oracle import AnalyticGaussianDenoiser, gaussian_loss_floor
 from .baseline import FittedGaussianBaseline
+from .normalize import ChannelNormalizer
 from .processes import (
     Process,
     ProcessReport,
@@ -29,6 +30,7 @@ from .processes import (
     GeometricBrownianMotion,
     VectorOU,
     StochasticOscillator,
+    StochasticHeat,
     PROCESSES,
     get_process,
     make_process,
@@ -42,9 +44,10 @@ __all__ = [
     "TrainConfig", "train_denoiser", "ddpm_sample",
     "validate", "ValidationReport", "marginal_variance", "lag1_autocorrelation",
     "irreducible_eps_loss",
-    "AnalyticGaussianDenoiser", "gaussian_loss_floor",
+    "AnalyticGaussianDenoiser", "gaussian_loss_floor", "FittedGaussianBaseline",
+    "ChannelNormalizer",
     "Process", "ProcessReport", "StatCheck", "LinearTransition",
-    "OUProcess", "BrownianMotion", "GeometricBrownianMotion", "VectorOU", "StochasticOscillator" 
+    "OUProcess", "BrownianMotion", "GeometricBrownianMotion",
+    "VectorOU", "StochasticOscillator", "StochasticHeat",
     "PROCESSES", "get_process", "make_process",
 ]
-

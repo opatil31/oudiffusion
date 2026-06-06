@@ -13,11 +13,16 @@ class TrainConfig:
     steps: int = 20_000
     batch_size: int = 256
     lr: float = 2e-4
+    lr_final: float | None = None
     grad_clip: float | None = 1.0
     ema_decay: float = 0.999
     base_channels: int = 32
     log_every: int = 1_000
     seed: int = 0
+
+def _cosine_lr(step: int, total: int, lr0: float, lr1: float) -> float:
+    t = (step - 1) / max(total - 1, 1)
+    return lr1 + 0.5 * (lr0 - lr1) * (1.0 + np.cos(np.pi * t))
 
 def train_denoiser(
     x0: np.ndarray,
@@ -45,6 +50,10 @@ def train_denoiser(
     losses = []
     model.train()
     for step in range(1, cfg.steps + 1):
+        if cfg.lr_final is not None:
+            lr_now = _cosine_lr(step, cfg.steps, cfg.lr, cfg.lr_final)
+            for g in opt.param_groups:
+                g["lr"] = lr_now
         idx = torch.randint(0, N, (cfg.batch_size,), generator=gen, device=device)
         xb = data[idx]
         t = torch.randint(0, schedule.T, (cfg.batch_size,), generator=gen, device=device)
@@ -62,6 +71,9 @@ def train_denoiser(
         if step % cfg.log_every == 0 or step == 1:
             losses.append((step, loss.item()))
             if verbose:
-                print(f"step {step:>6d}/{cfg.steps}   loss {loss.item():.5f}")
+                 msg = f"step {step:>6d}/{cfg.steps}   loss {loss.item():.5f}"
+                 if cfg.lr_final is not None:
+                     msg += f"   lr {lr_now:.2e}"
+                 print(msg)
 
     return model, ema, losses

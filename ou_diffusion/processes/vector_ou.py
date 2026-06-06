@@ -60,7 +60,9 @@ class VectorOU(Process):
         self.Sinf = _stationary(self.A, self.Q)
         self._Q_sqrt = _psd_sqrt(self.Q)
         self._S_sqrt = _psd_sqrt(self.Sinf)
-        self.lag_check = 5 # horizon for the lag-h validation target
+        self.lag_check = 5
+        self.se_replications = 12
+        self._se_cache: dict = {}
 
     def describe(self) -> dict:
         return dict(self._desc)
@@ -91,8 +93,11 @@ class VectorOU(Process):
     def transition(self) -> LinearTransition:
         return LinearTransition(A=self.A.copy(), b=np.zeros(self.d), Q=self.Q.copy())
 
-    def validate(self, traj: np.ndarray) -> ProcessReport:
-        x = as_ndl(traj, self.d)                       # (N, d, L)
+    def _stat_names(self, h: int) -> list[str]:
+        return ["mean (max abs)", "stationary cov rel dev",
+                "lag-1 xcov rel dev", f"lag-{h} xcov rel dev"]
+
+    def _stats(self, x: np.ndarray):
         N, d, L = x.shape
         xc = x - x.mean(axis=(0, 2))[None, :, None]
 
@@ -104,18 +109,34 @@ class VectorOU(Process):
             return float(np.linalg.norm(emp - tgt) / np.linalg.norm(tgt))
 
         h = max(2, min(self.lag_check, L - 2))
-        checks = [
-            StatCheck("mean (max abs)", float(np.abs(x.mean(axis=(0, 2))).max()),
-                      0.0, "abs"),
-            StatCheck("stationary cov rel dev", rel_dev(emp_lag(0), self.Sinf),
-                      0.0, "abs"),
-            StatCheck("lag-1 xcov rel dev", rel_dev(emp_lag(1), self.A @ self.Sinf),
-                      0.0, "abs"),
-            StatCheck(f"lag-{h} xcov rel dev",
-                      rel_dev(emp_lag(h),
-                              np.linalg.matrix_power(self.A, h) @ self.Sinf),
-                      0.0, "abs"),
-        ]
+        vals = np.array([
+            float(np.abs(x.mean(axis=(0, 2))).max()),
+            rel_dev(emp_lag(0), self.Sinf),
+            rel_dev(emp_lag(1), self.A @ self.Sinf),
+            rel_dev(emp_lag(h), np.linalg.matrix_power(self.A, h) @ self.Sinf),
+        ])
+        return h, vals
+
+    def _noise_floor(self, N: int, L: int):
+        key = (N, L)
+        if key not in self._se_cache:
+            vals = [self._stats(self.exact_sample(N, L, seed=90_000 + 17 * i))[1]
+                    for i in range(self.se_replications)]
+            arr = np.stack(vals)
+            self._se_cache[key] = (arr.mean(axis=0), arr.std(axis=0))
+        return self._se_cache[key]
+
+    def validate(self, traj: np.ndarray, calibrate: bool = True) -> ProcessReport:
+        x = as_ndl(traj, self.d)
+        h, vals = self._stats(x)
+        names = self._stat_names(h)
+        if calibrate:
+            mu0, sd0 = self._noise_floor(x.shape[0], x.shape[2])
+            checks = [StatCheck(nm, float(v), float(m), "abs", se=float(sd))
+                      for nm, v, m, sd in zip(names, vals, mu0, sd0)]
+        else:
+            checks = [StatCheck(nm, float(v), 0.0, "abs")
+                      for nm, v in zip(names, vals)]
         return ProcessReport(self.name, checks)
 
 
