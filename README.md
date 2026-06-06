@@ -17,13 +17,13 @@ This project focuses on the data sources are chosen so that the dataset has exac
 
 ## 2. The processes:
 
-| process | dynamics | new difficulty | exact verification anchors |
+| process | dynamics | new difficulty |
 |---|---|---|---|
-| `ou` | $dx=-\theta x\,dt+\sigma\,dW$ | baseline | stationary $\sigma^2/2\theta$, lag-1 $e^{-\theta\Delta t}$, Kalman, oracle + loss floor |
-| `bm` | $dx=\mu\,dt+\sigma\,dW$ | nonstationary, singular cov | variance-growth slope, increment statistics |
-| `gbm` | $dx=\mu x\,dt+\sigma x\,dW$ | **non-Gaussian**, positive | log-space reduction, lognormal moments, linear-denoiser bound |
-| `vou` / `osc` | $dx=-\Theta x\,dt+B\,dW$ | matrix dynamics, $d{=}2$ channels | Van Loan $A,Q$; Lyapunov $S$; lag-$h$ laws $A^hS$ |
-| `heat` | $du=[-\lambda u+\kappa\\partial_x^2u]\,dt+\sigma\,dW$ | spatial field, stiff spectrum | per-mode OU targets, $\theta_j=\lambda+4\kappa\sin^2(\pi j/d)$ |
+| `ou` | $dx=-\theta x\,dt+\sigma\,dW$ | baseline |
+| `bm` | $dx=\mu\,dt+\sigma\,dW$ | nonstationary, singular cov |
+| `gbm` | $dx=\mu x\,dt+\sigma x\,dW$ | **non-Gaussian**, positive |
+| `vou` / `osc` | $dx=-\Theta x\,dt+B\,dW$ | matrix dynamics, $d{=}2$ channels |
+| `heat` | $du=[-\lambda u+\kappa\\partial_x^2u]\,dt+\sigma\,dW$ | spatial field, stiff spectrum |
 
 All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is an exact trajectory sampler **plus its own ground truth**, validation targets, the exact one-step transition kernel $x_{\ell+1}\mid x_\ell \sim \mathcal N(Ax_\ell+b,\,Q)$ (exposed deliberately: it is what autoregressive validation will condition on), and, for Gaussian processes, the mean and covariance of the flattened trajectory, which feed the oracle and loss floor of Section 4. Vector-valued systems map onto the existing U-Net with **channels = state dimensions**, no architecture change.
 
