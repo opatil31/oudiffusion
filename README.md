@@ -67,7 +67,7 @@ The U-Net is the note's 3-resolution design ($C \to 2C\times\frac L2 \to 4C\time
 | analytic oracle $\epsilon^\star$ through the sampler | 0.491 | 0.9500 |
 | **trained 1D U-Net** | **0.4877** | **0.9494** |
 
-Training loss plateaus at 0.10–0.12 around the 0.1071 floor (per-step wander is minibatch composition: the per-$k$ floor spans ≈1 at $k{=}0$ to ≈0 at $k{=}K$). The network sits at the loss floor *and* matches the oracle, so the residual ~2% variance gap is **sampler discretization bias**, not learning error. Nothing in the result is unexplained.
+Training loss plateaus at 0.10–0.12 around the 0.1071 floor (per-step wander is minibatch composition: the per-$k$ floor spans ≈1 at $k{=}0$ to ≈0 at $k{=}K$). The network sits at the loss floor *and* matches the oracle, so the residual ~2% variance gap is **sampler discretization bias**, not learning error.
 
 ## 5. Findings
 
