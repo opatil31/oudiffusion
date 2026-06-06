@@ -1,95 +1,136 @@
-# Implementation of Prof Vishwanath's OU Diffusion Note
+# Space-Time Diffusion Ongoing Project
 Author: Oankar Patil
 
-My pipeline implementation here follows the reading-group note *"A Fully Worked 1D Example: From a Scalar Wiener Process to a U-Net Diffusion Model"* (Algorithms 1–5).
+**Five stochastic processes with closed-form ground truth: scalar OU, Brownian motion, geometric Brownian motion, a vector OU / stochastic oscillator, and a 1D stochastic heat equation**
+
+These are used to train and, more importantly, analyze denoising diffusion models, through every stage of the pipeline: data, forward process, filter, training loss, sampler, output statistics.
+
+Main Findings: First, in five separately documented instances the training loss sat exactly on its analytic optimum while calibrated sample statistics measured real distributional biases between $z=+3$ and $z=+30$. Second, the residual error of a conv-U-Net diffusion model is consistently located in *temporal dynamics* (decay rates, phases, long-horizon coherence) rather than marginal power, generated fine structure decorrelates a measurable few percent too fast. These should translate to audio/video cases.
+
+The pipeline follows the reading-group note *"A Fully Worked 1D Example: From a Scalar Wiener Process to a U-Net Diffusion Model"* (Algorithms 1–5); the additional process beyond scalar OU, the verification classes, and the findings below are this repository's additions. This is part of a larger effort on autoregressive / space–time diffusion project.
 
 ---
-## 1. Why the Ornstein–Uhlenbeck process
 
-The OU process is the linear scalar Itô SDE
+## 1. Design principle:
 
-$$dx_t = -\theta\, x_t\, dt + \sigma\, dW_t, \qquad \theta, \sigma > 0,$$
+This project focuses on the data sources are chosen so that the dataset has exact statistics.
 
-the continuous-time analogue of an AR(1) model: mean-reverting toward 0 at rate $\theta$, driven by a scalar Wiener process. It is the cleanest possible data source for a diffusion model because it is **exact at every level**:
+## 2. The processes:
 
-- **Exact sampler:** The transition over a step $\Delta t$ is Gaussian with no discretization error:
+| process | dynamics | new difficulty |
+|---|---|---|
+| `ou` | $dx=-\theta x\,dt+\sigma\,dW$ | baseline |
+| `bm` | $dx=\mu\,dt+\sigma\,dW$ | nonstationary, singular cov |
+| `gbm` | $dx=\mu x\,dt+\sigma x\,dW$ | **non-Gaussian**, positive |
+| `vou` / `osc` | $dx=-\Theta x\,dt+B\,dW$ | matrix dynamics, $d{=}2$ channels |
+| `heat` | $du=[-\lambda u+\kappa\\partial_x^2u]\,dt+\sigma\,dW$ | spatial field, stiff spectrum |
 
-$$x_{\ell} = a\, x_{\ell-1} + \sqrt{q}\,\xi, \qquad a = e^{-\theta \Delta t}, \quad q = \tfrac{\sigma^2}{2\theta}\left(1 - e^{-2\theta \Delta t}\right), \quad \xi \sim \mathcal N(0,1).$$
+All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is an exact trajectory sampler **plus its own ground truth**, validation targets, the exact one-step transition kernel $x_{\ell+1}\mid x_\ell \sim \mathcal N(Ax_\ell+b,\,Q)$ (exposed deliberately: it is what autoregressive validation will condition on), and, for Gaussian processes, the mean and covariance of the flattened trajectory, which feed the oracle and loss floor of Section 4. Vector-valued systems map onto the existing U-Net with **channels = state dimensions**, no architecture change.
 
-- **Exact target statistics:** The stationary distribution is $\mathcal N(0, s^2)$ with $s^2 = \sigma^2/2\theta$, and the lag-1 autocorrelation is $a$. Generated trajectories must reproduce both numbers.
-- **Exact filter:** The model is linear-Gaussian, so the optimal estimator under measurement noise is the two-line scalar Kalman filter.
-- **Exact denoiser and loss floor:** OU trajectories are *jointly Gaussian*, which makes the optimal noise predictor.
-
-**Two clocks:** Throughout, physical time $\ell$ (indexing the trajectory) and diffusion time $k$ (indexing the noising/denoising ladder) are distinct axes. The generative model treats each trajectory $x^{(0)} \in \mathbb R^L$ as a fixed data point and never sees the physical SDE again, the structural echo between the OU transition and the DDPM forward step (both are "shrink and add Gaussian noise") lives on *different clocks*. Keeping the two clocks separate is the conceptual backbone of the planned autoregressive extension, where they form a frames × noise-levels lattice.
-
-## 2. The pipeline
+## 3. The pipeline
 
 | Stage | Math | Module |
 |---|---|---|
-| 1. Data | exact AR(1) transition above; $x^{(0)} \in \mathbb R^{L}$, $N$ trajectories | `ou_diffusion/ou_process.py` |
-| 2. Forward diffusion | $x^{(k)} = \sqrt{\bar\alpha_k}\, x^{(0)} + \sqrt{1-\bar\alpha_k}\,\epsilon$, linear $\beta$ schedule | `ou_diffusion/schedule.py` |
-| 3. Filtering | scalar Kalman predict/update on $y_\ell = x_\ell + v_\ell$ | `ou_diffusion/kalman.py` |
-| 4. Reverse process | 1D U-Net $\epsilon_\theta(x^{(k)}, k)$, MSE objective, ancestral sampling | `ou_diffusion/unet1d.py`, `train.py`, `sample.py` |
-| Validation | marginal variance vs $s^2$, lag-1 autocorrelation vs $a$, loss vs floor | `ou_diffusion/validate.py` |
+| 1. Data | exact process sampler; $x^{(0)}\in\mathbb R^{d\times L}$, $N$ trajectories | `ou_diffusion/processes/` |
+| 2. Forward diffusion | $x^{(k)}=\sqrt{\bar\alpha_k}\,x^{(0)}+\sqrt{1-\bar\alpha_k}\,\epsilon$, linear $\beta$ schedule | `schedule.py` |
+| 3. Filtering (OU demo) | scalar Kalman predict/update on $y_\ell=x_\ell+v_\ell$ | `kalman.py` |
+| 4. Reverse process | 1D U-Net $\epsilon_\theta(x^{(k)},k)$, MSE objective, ancestral sampling | `unet1d.py`, `train.py`, `sample.py` |
+| Validation | per-process targets, oracle, floors, calibrated z-statistics | `processes/`, `oracle.py` |
 
-The U-Net is the note's 3-resolution design: $1\times L \to C\times L \to 2C\times\frac L2 \to 4C\times\frac L4$ and symmetrically back up with skip connections, the diffusion step injected into every residual block through a sinusoidal embedding.
+The U-Net is the note's 3-resolution design ($C \to 2C\times\frac L2 \to 4C\times\frac L4$ and back with skips), the diffusion step injected into every residual block through a sinusoidal embedding. Training supports EMA and optional cosine LR decay (`--lr-final`); `--normalize` adds exactly-invertible per-channel standardization with the printed loss floor rescaled consistently.
 
-**Filtering is a separate task from diffusion**, and the repo keeps them separate on purpose: diffusion noise is *designed*, added on the diffusion clock, and removed by the learned reverse process; measurement noise is *given*, lives on the physical clock, and is removed by the Kalman filter. For this linear-Gaussian signal both removals are Bayesian posterior computations, which is exactly why OU is the right place to first see their relationship.
+**Two clocks:** Physical time $\ell$ (indexing the trajectory) and diffusion time $k$ (indexing the noising ladder) are distinct axes. The generative model treats each trajectory as a fixed data point and never sees the physical SDE again. Keeping the clocks separate is the conceptual backbone of the autoregressive extension, where they form a frames × noise-levels lattice.
 
-## 3. Verification
-**The training loss has a known floor:** Because $x^{(0)} \sim \mathcal N(0, \Sigma)$ with $\Sigma_{ij} = s^2 a^{|i-j|}$, the posterior covariance of $\epsilon$ given $x^{(k)}$ is $I - (1-\bar\alpha_k)\Sigma_k^{-1}$ with $\Sigma_k = \bar\alpha_k \Sigma + (1-\bar\alpha_k) I$, so the irreducible per-coordinate $\epsilon$-prediction MSE, averaged over uniformly sampled $k$, is
+## 4. Verification:
 
-$$\mathcal L^\star = \frac1K \sum_k \Big[ 1 - (1-\bar\alpha_k)\, \tfrac1L\, \mathrm{tr}\,\Sigma_k^{-1} \Big] = \mathbf{0.1071} \quad (\theta{=}1, \sigma{=}1, \Delta t{=}0.05, L{=}64, K{=}1000).$$
+**Loss floor:** For Gaussian data $x^{(0)}\sim\mathcal N(\mu,\Sigma)$ the posterior covariance of $\epsilon$ given $x^{(k)}$ is closed-form, so the irreducible $\epsilon$-MSE averaged over uniform $k$ is a number, e.g. $\mathcal L^\star=\mathbf{0.1071}$ for OU at $(\theta,\sigma,\Delta t,L,K)=(1,1,0.05,64,1000)$. A network plateauing here *is* the optimal denoiser. (`oracle.gaussian_loss_floor`, any Gaussian process, scalar or vector.)
 
-A network whose loss plateaus here *is* the optimal denoiser; more training or capacity cannot help. (`validate.irreducible_eps_loss`)
+**Analytic oracle:** The optimal noise predictor for Gaussian data is linear and known: $\epsilon^\star(x^{(k)},k)=\sqrt{1-\bar\alpha_k}\,\Sigma_k^{-1}(x^{(k)}-\sqrt{\bar\alpha_k}\mu)$. Plugging $\epsilon^\star$ into the production sampler (`scripts/verify_optimal_denoiser.py`) isolates sampler/schedule error from learning error, a decomposition usually impossible in generative modeling. For non-Gaussian processes the **linear-denoiser bound** (Gaussian floor of the empirical covariance) plays the complementary role: a loss below it proves the network beats every linear denoiser.
 
-**Output statistics against exact targets:** Marginal variance vs $s^2 = 0.5$; lag-1 autocorrelation vs $a = e^{-0.05} \approx 0.9512$.
+**Calibrated statistics:** Output statistics are checked against exact targets, and because the deviation statistics are norms with strictly positive null expectation, raw percentages conflate estimator noise with model bias. Every vector-process check is therefore calibrated against exact-sampler replications at the same sample size: the report's target column is the finite-sample noise-floor mean.
 
-### Results ($K = 1000$, $6{,}000$ training steps, $N = 10{,}000$, $L = 64$)
+**Worked demonstration (scalar OU, $K{=}1000$, 6k steps, $N{=}10{,}000$, $L{=}64$):**
 
 | | marginal variance | lag-1 autocorrelation |
 |---|---|---|
 | exact OU target | 0.5000 | 0.9512 |
 | analytic oracle $\epsilon^\star$ through the sampler | 0.491 | 0.9500 |
-| **trained 1D U-Net** | **0.4981** | **0.9494** |
+| **trained 1D U-Net** | **0.4877** | **0.9494** |
 
-Training loss plateaus at **0.10–0.12**, oscillating around the **0.1071** floor (the per-step fluctuation is minibatch noise: the per-$k$ floor spans $\approx 1$ at $k{=}0$ down to $\approx 0$ at $k{=}K$, so batch composition moves single-batch estimates, readings slightly *below* the floor are high-$k$-heavy batches, not super-optimal learning).
+Training loss plateaus at 0.10–0.12 around the 0.1071 floor (per-step wander is minibatch composition: the per-$k$ floor spans ≈1 at $k{=}0$ to ≈0 at $k{=}K$). The network sits at the loss floor *and* matches the oracle, so the residual ~2% variance gap is **sampler discretization bias**, not learning error.
 
-**Error attribution.** The network sits at the information-theoretic loss floor *and* matches the oracle's output statistics, so the residual $\sim 2\%$ variance gap to the exact target is **sampler discretization bias** (finite $K$, fixed-$\beta$ reverse variance, residual terminal signal), not learning error.
-## 4. A measured finding: terminal SNR and the choice of $K$
+## 5. Findings
 
-The note suggests $K = 200$ diffusion steps works fine. However the linear $\beta \in [10^{-4}, 0.02]$ schedule only reaches $\bar\alpha_K \approx 0.132$ at $K = 200$: about $36\%$ of the signal *amplitude* survives the forward process, so initializing the reverse process at pure $\mathcal N(0, I)$ is mis-specified. An oracle computation makes this exactly measurable:
+### 5.1 Terminal SNR and the choice of $K$ (a sampler finding)
+
+The note suggests $K=200$ works, but the linear $\beta\in[10^{-4},0.02]$ schedule only reaches $\bar\alpha_K\approx0.132$ there: ~36% of signal amplitude survives the forward process, so initializing the reverse process at pure $\mathcal N(0,I)$ is mis-specified. The oracle measures it exactly:
 
 | $K$ | $\bar\alpha_K$ | oracle marginal variance (target 0.5) |
 |---|---|---|
 | 200 | 0.132 | 0.365 (−27%) |
 | 1000 | $4\times10^{-5}$ | 0.491 (−1.8%) |
 
-Remedies would be to use $K = 1000$ (default in the commands below), we could also try switching to a cosine scheduler.
+This reproduces the zero-terminal-SNR issue known in literature (Lin et al., 2024) with the learning component ruled out. All commands thus instead below default to $K=1000$.
 
-## 5. Quickstart
+### 5.2 Learning findings:
+**Summary:** Across all three vector-valued processes the conv-U-Net + uniform-$k$ $\varepsilon$-MSE pair errs specifically in *temporal structure*, decay rates, phases, long-horizon coherence, while matching marginal power almost everywhere. In five separately documented instances the training loss sat on its analytic floor while sample-space instruments measured biases between $z=+3$ and $z=+30$: the loss is a necessary diagnostic and a blind one, and the oracle plus replication-calibrated statistics are the operative instruments. This is the underlying idea of generated transients decorrelate too fast, which motivates measurement for long-context denoiser architectures and the baseline that autoregressive-rollout experiments on these same processes should be judged against.
 
+## 6. Quickstart
+I'd suggest making a venv first and then activating it and doing the following:
 ```bash
-pip install -r requirements.txt              # numpy, torch
+pip install -r requirements.txt              # numpy, torch, matplotlib
 
-# Full run (about 25 min on 1 CPU core; minutes on GPU with --device cuda):
-python -m scripts.run_ou --K 1000 --steps 6000 --device cuda
+# Full runs (GPU with --device cuda):
+python -m scripts.run --process ou --K 1000 --steps 6000 --save-samples samples.npy
+python -m scripts.run --process bm --mu 0.3 --K 1000 --steps 6000
+python -m scripts.run --process gbm --K 1000 --steps 6000 --baseline
+python -m scripts.run --process vou --K 1000 --steps 16000
+python -m scripts.run --process osc --K 1000 --steps 16000 --base-channels 64 --normalize --lr-final 2e-5
+python -m scripts.run --process heat --K 1000 --steps 16000 --base-channels 64 --n-samples 10000
 
-# Kalman filtering demo on noisy measurements
-python -m scripts.run_ou --K 1000 --steps 6000 --kalman-demo --R 0.5 --device cuda
+# Optional: Kalman filtering demo on noisy measurements (OU)
+python -m scripts.run --process ou --K 1000 --steps 6000 --kalman-demo --R 0.5
 ```
 
-## 6. Repository layout
+## 7. Repository layout
 
 ```
 ou_diffusion/
+  processes/        data sources with exact targets (the Process interface)
+    base.py           exact_sample / validate / mean / covariance / transition
+    ou.py             Ornstein-Uhlenbeck (stationary, Gaussian)
+    brownian.py       Brownian motion +- drift (nonstationary, Gaussian)
+    gbm.py            geometric Brownian motion (non-Gaussian, positive, skewed)
+    vector_ou.py      vector OU + stochastic oscillator (matrix dynamics, d = 2)
+    heat.py           1D stochastic heat equation (spatial field, stiff mode spectrum)
+  baseline.py       FittedGaussianBaseline: moment-matched control model
+  normalize.py      ChannelNormalizer: exactly-invertible per-channel standardization
+  oracle.py         AnalyticGaussianDenoiser + gaussian_loss_floor (any Gaussian process)
   ou_process.py     Stage 1: exact OU sampler (Algorithm 1)
   schedule.py       Stage 2: DDPM schedule + q_sample (Eq. 6-8)
   kalman.py         Stage 3: scalar Kalman filter (Algorithm 3)
-  unet1d.py         Stage 4: 1D U-Net eps-predictor
-  train.py          Stage 4: training loop (Algorithm 4) + EMA
+  unet1d.py         Stage 4: 1D U-Net eps-predictor (channels = state dims)
+  train.py          Stage 4: training loop (Algorithm 4) + EMA + cosine LR decay
   sample.py         Stage 4: ancestral sampler (Algorithm 5)
-  validate.py       statistics vs targets
+  validate.py       OU statistics + irreducible loss floor (Phase-A interface)
 scripts/
-  run_ou.py                   end-to-end pipeline
+  run.py                      process-agnostic end-to-end pipeline
+  run_ou.py                   Phase-A alias (forwards to run.py --process ou)
+  verify_optimal_denoiser.py  analytic oracle per process, K sweep
+  plot_samples.py             real-vs-generated figure
+tests/                        per-stage and per-process unit tests
 ```
+
+## 8. Status and My Direction
+
+**Current:** Five exactly-verified processes (scalar OU, Brownian motion, geometric Brownian motion, vector OU / stochastic oscillator, 1D stochastic heat equation).
+
+**Next: autoregressive diffusion on the same processes**, validated against the exact conditionals every process already exposes through `transition()` one step ahead $\mathcal N(Ax+b,\,Q)$, with closed-form $h$-step predictive laws, so gap becomes an exactly measurable curve, with Section 5's horizon and over-damping results as its baselines. Per-frame noise levels (Diffusion Forcing / Rolling Diffusion style).
+
+## References
+
+- Reading-group note: *A Fully Worked 1D Example: From a Scalar Wiener Process to a U-Net Diffusion Model* (2026) — pipeline design (Algorithms 1–5).
+- Ho, Jain, Abbeel. *Denoising Diffusion Probabilistic Models.* NeurIPS 2020.
+- Lin, Liu, Li, Yang. *Common Diffusion Noise Schedules and Sample Steps are Flawed.* WACV 2024 — zero terminal SNR.
+- Särkkä. *Bayesian Filtering and Smoothing.* CUP 2013 — Kalman filtering background.
+- Chen et al. *Diffusion Forcing: Next-token Prediction Meets Full-Sequence Diffusion.* NeurIPS 2024; Ruhe et al. *Rolling Diffusion Models.* ICML 2024 — next-phase directions.
