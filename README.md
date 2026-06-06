@@ -84,7 +84,7 @@ This reproduces the zero-terminal-SNR issue known in literature (Lin et al., 202
 
 ### 5.2 Learning findings:
 
-**Rotation–contraction vector OU:** Rerun at 16k steps under the calibrated checks, it lands at the same wall as the oscillator: genuine second-order bias 1.7–2.2% ($z=+3.5/+3.5/+3.8$ against the noise floors), largest at the longest lag checked. Notably it reaches that wall at 32 channels, without the capacity increase the oscillator requires, its correlation length (≈20 steps) fits inside the receptive field, so the wall's height is set by the architecture–objective pair.
+**Rotation–contraction vector OU:** At 16k steps under the calibrated checks, it lands at the same wall as the oscillator, with second-order bias 1.7–2.2% ($z=+3.5/+3.5/+3.8$ against the noise floors), largest at the longest lag checked. Notably it reaches that wall at 32 channels, without the capacity increase the oscillator requires, its correlation length (≈20 steps) fits inside the receptive field, so the wall's height is set by the architecture–objective pair.
 
 **Oscillator:** The best configuration ($K{=}1000$, 16k steps, 64 channels) reproduces the exact second-order law to 2.5–3.5% out to quarter-period lags, with the residual at $z=+3.2/+3.1/+4.5$ against calibrated noise floors. The residual survived a six-hypothesis elimination: sampler (the analytic oracle is statistically indistinguishable from the exact sampler at $K=1000$), capacity (32→64 channels cut the bias 3×, then saturated), training length (8k→16k flat), channel scale (per-channel normalization ablation: unchanged), receptive field ($L=32$ diagnostic: genuine bias unchanged), and optimization schedule (cosine LR decay, verified active from its one-sided convergence fingerprint). A held-out set of tests (lags 4/8/32, the full $dL\times dL$ trajectory covariance, marginal kurtosis) landed on the same bias curve, ruling out metric overfitting, and revealed structure: the bias grows with temporal horizon (2.5% at lag-1 to 7.4% at half-period), consistent with few-percent errors in learned dynamics compounding coherently in phase and envelope. Closed, with the half-period lag as the documented exception.
 
@@ -93,7 +93,7 @@ This reproduces the zero-terminal-SNR issue known in literature (Lin et al., 202
 **Synthesis:** Across all three vector-valued processes the conv-U-Net + uniform-$k$ $\varepsilon$-MSE pair errs specifically in *temporal structure*, decay rates, phases, long-horizon coherence, while matching marginal power almost everywhere. In five separately documented instances the training loss sat on its analytic floor while sample-space instruments measured biases between $z=+3$ and $z=+30$: the loss is a necessary diagnostic and a blind one, and the oracle plus replication-calibrated statistics are the operative instruments. This is the underlying idea of generated transients decorrelate too fast, which motivates measurement for long-context denoiser architectures and the baseline that autoregressive-rollout experiments on these same processes should be judged against.
 
 ## 6. Quickstart
-
+I'd suggest making a venv first and then activating it and doing the following:
 ```bash
 pip install -r requirements.txt              # numpy, torch, matplotlib
 
