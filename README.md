@@ -3,11 +3,11 @@ Author: Oankar Patil
 
 **Five stochastic processes with closed-form ground truth: scalar OU, Brownian motion, geometric Brownian motion, a vector OU / stochastic oscillator, and a 1D stochastic heat equation**
 
-These are used to train and, more importantly, analyze denoising diffusion models. Every stage of the pipeline (data, forward process, filter, training loss, sampler, output statistics) is verified against a value it provably must produce.
+These are used to train and, more importantly, analyze denoising diffusion models, through every stage of the pipeline: data, forward process, filter, training loss, sampler, output statistics.
 
-Main Findings: First, in five separately documented instances the training loss sat exactly on its analytic optimum while calibrated sample statistics measured real distributional biases between $z=+3$ and $z=+30$: the $\varepsilon$-MSE loss is a necessary diagnostic and a blind one. Second, the residual error of a conv-U-Net diffusion model is consistently located in *temporal dynamics* (decay rates, phases, long-horizon coherence) rather than marginal power: generated fine structure decorrelates a measurable few percent too fast. These should translate to audio/video cases.
+Main Findings: First, in five separately documented instances the training loss sat exactly on its analytic optimum while calibrated sample statistics measured real distributional biases between $z=+3$ and $z=+30$. Second, the residual error of a conv-U-Net diffusion model is consistently located in *temporal dynamics* (decay rates, phases, long-horizon coherence) rather than marginal power, generated fine structure decorrelates a measurable few percent too fast. These should translate to audio/video cases.
 
-The pipeline follows the reading-group note *"A Fully Worked 1D Example: From a Scalar Wiener Process to a U-Net Diffusion Model"* (Algorithms 1–5); the process roster, the verification stack, and the findings below are this repository's additions. This is part of a larger effort on autoregressive / space–time diffusion project.
+The pipeline follows the reading-group note *"A Fully Worked 1D Example: From a Scalar Wiener Process to a U-Net Diffusion Model"* (Algorithms 1–5); the additional process beyond scalar OU, the verification classes, and the findings below are this repository's additions. This is part of a larger effort on autoregressive / space–time diffusion project.
 
 ---
 
@@ -25,7 +25,7 @@ This project focuses on the data sources are chosen so that the dataset has exac
 | `vou` / `osc` | $dx=-\Theta x\,dt+B\,dW$ | matrix dynamics, $d{=}2$ channels | Van Loan $A,Q$; Lyapunov $S$; lag-$h$ laws $A^hS$ |
 | `heat` | $du=[-\lambda u+\kappa\,\partial_x^2u]\,dt+\sigma\,dW$ | spatial field, stiff spectrum | per-mode OU targets, $\theta_j=\lambda+4\kappa\sin^2(\pi j/d)$ |
 
-All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is an exact trajectory sampler **plus its own ground truth** — validation targets, the exact one-step transition kernel $x_{\ell+1}\mid x_\ell \sim \mathcal N(Ax_\ell+b,\,Q)$ (exposed deliberately: it is what autoregressive validation will condition on), and, for Gaussian processes, the mean and covariance of the flattened trajectory, which feed the oracle and loss floor of Section 4. Vector-valued systems map onto the existing U-Net with **channels = state dimensions**, no architecture change.
+All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is an exact trajectory sampler **plus its own ground truth**, validation targets, the exact one-step transition kernel $x_{\ell+1}\mid x_\ell \sim \mathcal N(Ax_\ell+b,\,Q)$ (exposed deliberately: it is what autoregressive validation will condition on), and, for Gaussian processes, the mean and covariance of the flattened trajectory, which feed the oracle and loss floor of Section 4. Vector-valued systems map onto the existing U-Net with **channels = state dimensions**, no architecture change.
 
 **Scalar OU** is the continuous-time AR(1): exact transition $x_\ell = a x_{\ell-1} + \sqrt q\,\xi$ with $a=e^{-\theta\Delta t}$, $q=\frac{\sigma^2}{2\theta}(1-e^{-2\theta\Delta t})$, stationary $\mathcal N(0,\sigma^2/2\theta)$, and because the model is linear-Gaussian, an exact Kalman filter under measurement noise, kept deliberately separate from diffusion (designed noise on the diffusion clock vs given noise on the physical clock).
 
@@ -49,7 +49,7 @@ All five sit behind one abstraction (`ou_diffusion/processes/`): a `Process` is 
 
 The U-Net is the note's 3-resolution design ($C \to 2C\times\frac L2 \to 4C\times\frac L4$ and back with skips), the diffusion step injected into every residual block through a sinusoidal embedding. Training supports EMA and optional cosine LR decay (`--lr-final`); `--normalize` adds exactly-invertible per-channel standardization with the printed loss floor rescaled consistently.
 
-**Two clocks.** Physical time $\ell$ (indexing the trajectory) and diffusion time $k$ (indexing the noising ladder) are distinct axes. The generative model treats each trajectory as a fixed data point and never sees the physical SDE again. Keeping the clocks separate is the conceptual backbone of the autoregressive extension, where they form a frames × noise-levels lattice.
+**Two clocks:** Physical time $\ell$ (indexing the trajectory) and diffusion time $k$ (indexing the noising ladder) are distinct axes. The generative model treats each trajectory as a fixed data point and never sees the physical SDE again. Keeping the clocks separate is the conceptual backbone of the autoregressive extension, where they form a frames × noise-levels lattice.
 
 ## 4. Verification:
 
@@ -57,7 +57,7 @@ The U-Net is the note's 3-resolution design ($C \to 2C\times\frac L2 \to 4C\time
 
 **Analytic oracle:** The optimal noise predictor for Gaussian data is linear and known: $\epsilon^\star(x^{(k)},k)=\sqrt{1-\bar\alpha_k}\,\Sigma_k^{-1}(x^{(k)}-\sqrt{\bar\alpha_k}\mu)$. Plugging $\epsilon^\star$ into the production sampler (`scripts/verify_optimal_denoiser.py`) isolates sampler/schedule error from learning error, a decomposition usually impossible in generative modeling. For non-Gaussian processes the **linear-denoiser bound** (Gaussian floor of the empirical covariance) plays the complementary role: a loss below it proves the network beats every linear denoiser.
 
-**Calibrated statistics:** Output statistics are checked against exact targets, and because the deviation statistics are norms with strictly positive null expectation, raw percentages conflate estimator noise with model bias. Every vector-process check is therefore calibrated against exact-sampler replications at the same sample size: the report's target column is the finite-sample noise-floor mean, each check carries the replication standard error, and deviations read in z-units. High-variance scalar checks (terminal skewness) carry bootstrap standard errors. Held-out functional batteries (unused lags, the full $dL\times dL$ trajectory covariance, Gaussianity probes) guard against tuning to the watched metrics.
+**Calibrated statistics:** Output statistics are checked against exact targets, and because the deviation statistics are norms with strictly positive null expectation, raw percentages conflate estimator noise with model bias. Every vector-process check is therefore calibrated against exact-sampler replications at the same sample size: the report's target column is the finite-sample noise-floor mean.
 
 **Worked demonstration (scalar OU, $K{=}1000$, 6k steps, $N{=}10{,}000$, $L{=}64$):**
 
@@ -73,18 +73,16 @@ Training loss plateaus at 0.10–0.12 around the 0.1071 floor (per-step wander i
 
 ### 5.1 Terminal SNR and the choice of $K$ (a sampler finding)
 
-The note suggests $K=200$ "works fine," but the linear $\beta\in[10^{-4},0.02]$ schedule only reaches $\bar\alpha_K\approx0.132$ there: ~36% of signal amplitude survives the forward process, so initializing the reverse process at pure $\mathcal N(0,I)$ is mis-specified. The oracle measures it exactly:
+The note suggests $K=200$ works, but the linear $\beta\in[10^{-4},0.02]$ schedule only reaches $\bar\alpha_K\approx0.132$ there: ~36% of signal amplitude survives the forward process, so initializing the reverse process at pure $\mathcal N(0,I)$ is mis-specified. The oracle measures it exactly:
 
 | $K$ | $\bar\alpha_K$ | oracle marginal variance (target 0.5) |
 |---|---|---|
 | 200 | 0.132 | 0.365 (−27%) |
 | 1000 | $4\times10^{-5}$ | 0.491 (−1.8%) |
 
-This reproduces the zero-terminal-SNR issue (Lin et al., 2024) with the learning component ruled out. All commands below default to $K=1000$.
+This reproduces the zero-terminal-SNR issue known in literature (Lin et al., 2024) with the learning component ruled out. All commands thus instead below default to $K=1000$.
 
 ### 5.2 Learning findings:
-
-**Acceptance criterion** (pre-stated for any future process:) a process is *closed* when, on a fresh draw of 10,000 trajectories, every replication-calibrated check and a held-out functional set of tests, including lags out to $L/2$ and a Gaussianity probe where applicable, falls within 5% absolute deviation, with any statistically significant residual error-barred, replicated, and attributed via the analytic oracle and an explicit elimination chain.
 
 **Rotation–contraction vector OU:** Rerun at 16k steps under the calibrated checks, it lands at the same wall as the oscillator: genuine second-order bias 1.7–2.2% ($z=+3.5/+3.5/+3.8$ against the noise floors), largest at the longest lag checked. Notably it reaches that wall at 32 channels, without the capacity increase the oscillator requires, its correlation length (≈20 steps) fits inside the receptive field, so the wall's height is set by the architecture–objective pair.
 
@@ -104,7 +102,7 @@ python -m scripts.run --process ou --K 1000 --steps 6000 --save-samples samples.
 python -m scripts.run --process bm --mu 0.3 --K 1000 --steps 6000
 python -m scripts.run --process gbm --K 1000 --steps 6000 --baseline
 python -m scripts.run --process vou --K 1000 --steps 16000
-python -m scripts.run --process osc --K 1000 --steps 16000 --base-channels 64 --normalize --lr-final 2e-5   # OSC closure config
+python -m scripts.run --process osc --K 1000 --steps 16000 --base-channels 64 --normalize --lr-final 2e-5
 python -m scripts.run --process heat --K 1000 --steps 16000 --base-channels 64 --n-samples 10000
 
 # Optional: Kalman filtering demo on noisy measurements (OU)
