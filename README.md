@@ -18,7 +18,7 @@ This project focuses on the data sources are chosen so that the dataset has exac
 ## 2. The processes:
 
 | process | dynamics | new difficulty |
-|---|---|---|---|
+|---|---|---|
 | `ou` | $dx=-\theta x\,dt+\sigma\,dW$ | baseline |
 | `bm` | $dx=\mu\,dt+\sigma\,dW$ | nonstationary, singular cov |
 | `gbm` | $dx=\mu x\,dt+\sigma x\,dW$ | **non-Gaussian**, positive |
