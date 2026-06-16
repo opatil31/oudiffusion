@@ -8,6 +8,9 @@ from .cir import CIRProcess
 from .jacobi import JacobiProcess
 from .studentt import StudentTProcess
 from .fgn import FGNProcess
+from .fbm import FBMProcess
+from .fou import FOUProcess
+from .fractional_pearson import FracCIRProcess, FracJacobiProcess, FracStudentTProcess
 from .pearson import PearsonDiffusion
 from .heat import StochasticHeat
 from .vector_ou import StochasticOscillator, VectorOU
@@ -18,6 +21,11 @@ PROCESSES: dict[str, type[Process]] = {
     "jacobi": JacobiProcess,
     "studentt": StudentTProcess,
     "fgn": FGNProcess,
+    "fbm": FBMProcess,
+    "fou": FOUProcess,
+    "frac_cir": FracCIRProcess,
+    "frac_jacobi": FracJacobiProcess,
+    "frac_studentt": FracStudentTProcess,
     "bm": BrownianMotion,
     "gbm": GeometricBrownianMotion,
     "vou": VectorOU,
@@ -59,6 +67,11 @@ __all__ = [
     "JacobiProcess",
     "StudentTProcess",
     "FGNProcess",
+    "FBMProcess",
+    "FOUProcess",
+    "FracCIRProcess",
+    "FracJacobiProcess",
+    "FracStudentTProcess",
     "PearsonDiffusion",
     "BrownianMotion",
     "GeometricBrownianMotion",
