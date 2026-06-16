@@ -1,3 +1,7 @@
+"""
+python scripts/runner.py --process cir --normalize --K 1000 --steps 6000 --n-samples 4000 --device cuda
+"""
+
 from __future__ import annotations
 import argparse
 import sys
@@ -115,7 +119,7 @@ def main(argv=None):
     if proc.is_gaussian:
         Sigma = proc.covariance(args.L)
         if norm is not None:
-            scale = np.repeat(norm.std_, args.L)        # channel-major flattening
+            scale = np.repeat(norm.std_, args.L)
             Sigma = Sigma / np.outer(scale, scale)
         floor = gaussian_loss_floor(Sigma, schedule.alphas_cumprod.numpy())
         print(f"irreducible eps-MSE loss floor for this config: {floor:.4f}")
