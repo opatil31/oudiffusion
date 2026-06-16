@@ -6,6 +6,8 @@ from .gbm import GeometricBrownianMotion
 from .ou import OUProcess
 from .cir import CIRProcess
 from .jacobi import JacobiProcess
+from .studentt import StudentTProcess
+from .fgn import FGNProcess
 from .pearson import PearsonDiffusion
 from .heat import StochasticHeat
 from .vector_ou import StochasticOscillator, VectorOU
@@ -14,6 +16,8 @@ PROCESSES: dict[str, type[Process]] = {
     "ou": OUProcess,
     "cir": CIRProcess,
     "jacobi": JacobiProcess,
+    "studentt": StudentTProcess,
+    "fgn": FGNProcess,
     "bm": BrownianMotion,
     "gbm": GeometricBrownianMotion,
     "vou": VectorOU,
@@ -23,6 +27,7 @@ PROCESSES: dict[str, type[Process]] = {
 
 
 def get_process(name: str, **kwargs) -> Process:
+    """Construct a process by registry name (e.g. get_process('bm', mu=0.3))."""
     key = name.lower()
     if key not in PROCESSES:
         raise KeyError(f"unknown process '{name}'; available: {sorted(PROCESSES)}")
@@ -30,6 +35,9 @@ def get_process(name: str, **kwargs) -> Process:
 
 
 def make_process(name: str, **maybe_kwargs) -> Process:
+    """Like get_process, but drops None values and parameters the class does
+    not accept -- convenient for CLI scripts with shared flags whose defaults
+    should fall through to each process's own defaults."""
     key = name.lower()
     if key not in PROCESSES:
         raise KeyError(f"unknown process '{name}'; available: {sorted(PROCESSES)}")
@@ -49,6 +57,8 @@ __all__ = [
     "OUProcess",
     "CIRProcess",
     "JacobiProcess",
+    "StudentTProcess",
+    "FGNProcess",
     "PearsonDiffusion",
     "BrownianMotion",
     "GeometricBrownianMotion",

@@ -1,7 +1,6 @@
 """
 python scripts/runner.py --process cir --normalize --K 1000 --steps 6000 --n-samples 4000 --device cuda
 """
-
 from __future__ import annotations
 import argparse
 import sys
@@ -39,6 +38,8 @@ def parse_args(argv=None):
     p.add_argument("--lam", type=float, default=None, help="HEAT damping")
     p.add_argument("--kappa", type=float, default=None, help="HEAT diffusivity")
     p.add_argument("--sites", type=int, default=None, help="HEAT spatial sites")
+    p.add_argument("--nu", type=float, default=None, help="StudentT degrees of freedom")
+    p.add_argument("--hurst", type=float, default=None, help="fGn/fBM Hurst exponent")
     # data / diffusion
     p.add_argument("--L", type=int, default=64)
     p.add_argument("--N", type=int, default=10_000)
@@ -73,7 +74,8 @@ def build_process(args):
     return make_process(args.process, theta=args.theta, sigma=args.sigma,
                         dt=args.dt, mu=args.mu, x0=args.x0,
                         omega=args.omega, zeta=args.zeta,
-                        lam=args.lam, kappa=args.kappa, sites=args.sites)
+                        lam=args.lam, kappa=args.kappa, sites=args.sites,
+                        nu=args.nu, hurst=args.hurst)
 
 
 def main(argv=None):
@@ -114,7 +116,6 @@ def main(argv=None):
         print(f"normalize: per-channel mean={np.round(norm.mean_, 4)} "
               f"std={np.round(norm.std_, 4)}")
 
-    # schedule
     schedule = make_linear_schedule(T=args.K)
     if proc.is_gaussian:
         Sigma = proc.covariance(args.L)
@@ -134,7 +135,6 @@ def main(argv=None):
         print(f"linear-denoiser loss bound (empirical covariance): {lin:.4f}")
         print("  -> a loss plateau below this proves the model beats every linear denoiser")
 
-    # train
     cfg = TrainConfig(steps=args.steps, batch_size=args.batch_size, lr=args.lr,
                       lr_final=args.lr_final,
                       base_channels=args.base_channels, seed=args.seed)
@@ -144,13 +144,12 @@ def main(argv=None):
         print(f"lr schedule: constant {cfg.lr:.1e}")
     model, ema, _ = train_denoiser(x_train, schedule, cfg, device=args.device)
 
-    # sample
     ema_model = ema.clone_into(model)
     samples = ddpm_sample(ema_model, schedule, n=args.n_samples, L=args.L,
                           d=proc.d, device=args.device, seed=args.seed + 2)
     samples = samples.numpy()
     if norm is not None:
-        samples = norm.inverse(samples) # back to data space
+        samples = norm.inverse(samples)
     print("\n[generated samples]")
     print(proc.validate(samples))
     if args.baseline:
